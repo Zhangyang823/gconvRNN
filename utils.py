@@ -77,8 +77,8 @@ class BatchLoader(object):
         input_fnames = [train_fname]
 
         # vocab_fname = os.path.join(data_dir, dataset_name, 'vocab_char.pkl')
-        tensor_fname = os.path.join(data_dir, dataset_name, 'bigfeature.pkl')
-        Adj_fname = os.path.join(data_dir, dataset_name, 'adj.pkl')
+        tensor_fname = os.path.join(data_dir, dataset_name, 'bigf.pkl')
+        Adj_fname = os.path.join(data_dir, dataset_name, 'adj11.pkl')
 
         # if not os.path.exists(vocab_fname) or not os.path.exists(tensor_fname) or not os.path.exists(Adj_fname):
         #     print("Creating vocab...")
