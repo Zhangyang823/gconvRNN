@@ -10,7 +10,7 @@ from datetime import datetime
 from IPython import embed
 import tensorflow.contrib.slim as slim
 from scipy.sparse import coo_matrix
-
+from tqdm import trange
 
 def save_config(model_dir, config):
     '''
@@ -71,32 +71,34 @@ def convert_to_one_hot(a, max_val=None):
 class BatchLoader(object):
     def __init__(self, data_dir, dataset_name, batch_size, seq_length):
         train_fname = os.path.join(data_dir, dataset_name, 'ptb.char.train.txt')
-        valid_fname = os.path.join(data_dir, dataset_name, 'ptb.char.valid.txt')
-        test_fname = os.path.join(data_dir, dataset_name, 'ptb.char.test.txt')
-        input_fnames = [train_fname, valid_fname, test_fname]
+        # valid_fname = os.path.join(data_dir, dataset_name, 'ptb.char.valid.txt')
+        # test_fname = os.path.join(data_dir, dataset_name, 'ptb.char.test.txt')
+        # input_fnames = [train_fname, valid_fname, test_fname]
+        input_fnames = [train_fname]
 
-        vocab_fname = os.path.join(data_dir, dataset_name, 'vocab_char.pkl')
-        tensor_fname = os.path.join(data_dir, dataset_name, 'data_char.pkl')
-        Adj_fname = os.path.join(data_dir, dataset_name, 'adj_char.pkl')
+        # vocab_fname = os.path.join(data_dir, dataset_name, 'vocab_char.pkl')
+        tensor_fname = os.path.join(data_dir, dataset_name, 'bigfeature.pkl')
+        Adj_fname = os.path.join(data_dir, dataset_name, 'adj.pkl')
 
-        if not os.path.exists(vocab_fname) or not os.path.exists(tensor_fname) or not os.path.exists(Adj_fname):
-            print("Creating vocab...")
-            self.text_to_tensor(input_fnames, vocab_fname, tensor_fname, Adj_fname)
+        # if not os.path.exists(vocab_fname) or not os.path.exists(tensor_fname) or not os.path.exists(Adj_fname):
+        #     print("Creating vocab...")
+        #     #创建pkl文件
+        #     self.text_to_tensor(input_fnames, vocab_fname, tensor_fname, Adj_fname)
 
-        print("Loading vocab...")
+        # print("Loading vocab...")
+
         adj = pklLoad(Adj_fname)
-        all_data = pklLoad(tensor_fname)
-        self.idx2char, self.char2idx = pklLoad(vocab_fname)
-        vocab_size = len(self.idx2char)
+        all_data = pklLoad(tensor_fname) #读取文本数字信息
+        # self.idx2char, self.char2idx = pklLoad(vocab_fname)
+        # vocab_size = len(self.idx2char)
 
-        print("Char vocab size: %d" % (len(self.idx2char)))
+        # print("Char vocab size: %d" % (len(self.idx2char)))
         self.sizes = []
         self.all_batches = []
         self.all_data = all_data
         self.adj = adj
 
         print("Reshaping tensors...")
-        print((np.array(list)).shape)
         for split, data in enumerate(all_data):  # split = 0:train, 1:valid, 2:test
             #Cutting training sample for check profile fast..(Temporal)
             #if split==0:
@@ -112,20 +114,22 @@ class BatchLoader(object):
             # 而不够一个 batch 的数据就丢掉不要了
 
             data = data[: batch_size * seq_length * int(math.floor(length / (batch_size * seq_length)))]
+            #将data弄成1000的整数，例如原本5017483变成5017000
             ydata = np.zeros_like(data)
-            # 又出现了这个操作，不明白到底干啥的
             #移位
             ydata[:-1] = data[1:].copy()
             ydata[-1] = data[0].copy()
 
             # 不明白 没看出来 if else 有什么区别
+            tt = [-1, batch_size, seq_length,2,110]
             if split < 2:
-                x_batches = list(data.reshape([-1, batch_size, seq_length]))
-                y_batches = list(ydata.reshape([-1, batch_size, seq_length]))
+                x_batches = list(data.reshape(tt))
+                #变成20*50=1000,方便后面处理
+                y_batches = list(ydata.reshape(tt))
                 self.sizes.append(len(x_batches))
             else:
-                x_batches = list(data.reshape([-1, batch_size, seq_length]))
-                y_batches = list(ydata.reshape([-1, batch_size, seq_length]))
+                x_batches = list(data.reshape(tt))
+                y_batches = list(ydata.reshape(tt))
                 self.sizes.append(len(x_batches))
 
             # 将数据作为x，移位的数据作为y，存入all_batches
@@ -140,7 +144,9 @@ class BatchLoader(object):
         if self.batch_idx[split_idx] >= self.sizes[split_idx]:
             self.batch_idx[split_idx] = 0
         idx = self.batch_idx[split_idx]
+
         self.batch_idx[split_idx] = self.batch_idx[split_idx] + 1
+        #all_batches[0][0][0],第一个0表示train,第二个0表示x_batch,第三个0表示x_batch第一行
         return self.all_batches[split_idx][0][idx], \
                self.all_batches[split_idx][1][idx]
 
@@ -165,9 +171,7 @@ class BatchLoader(object):
                 # 使 char2idx 变成26个英文字母+其他文中出现的字符的字典
                 # 使 idx2char 变成存储字符的list，里面的字符都是唯一的
                 for line in f:
-                    # 不明白这行起了什么作用，本来就是str，然后split又没加参数
                     line = ''.join(line.split())
-                    # 然后由于上面的不起作用，这行也是不起作用的
                     chars_in_line = list(line)
                     chars_in_line.append('|')
                     for char in chars_in_line:
@@ -181,11 +185,11 @@ class BatchLoader(object):
                         count += 1
             counts.append(count)
             output.append(np.array(output_chars))
-
+        keys=list(char2idx.keys())
+        print (keys,len(keys))
         train_data = output[0]
         train_data_shift = np.zeros_like(train_data)
         # train_data的第一个字符移到最后面，就变成了train_data_shift
-        # 不理解用意
         train_data_shift[:-1] = train_data[1:].copy()
         train_data_shift[-1] = train_data[0].copy()
 
@@ -193,6 +197,7 @@ class BatchLoader(object):
         Adj = np.zeros([len(idx2char), len(idx2char)])
         for x, y in zip(train_data, train_data_shift):
             Adj[x, y] += 1
+        #将adj是50*50的矩阵，序列数据xy存在的值加1，为权重。
 
         # Make Adj symmetric & visualize it
 
@@ -202,3 +207,10 @@ class BatchLoader(object):
         pklSave(vocab_fname, [idx2char, char2idx])
         pklSave(tensor_fname, output)
         pklSave(Adj_fname, Adj)
+
+# data_loader = BatchLoader('datasets','ptb_char',20, 50)
+# data_loader.reset_batch_pointer(0)
+# for k in trange(data_loader.sizes[0], desc="[per_batch]"):
+#     # Fetch training data
+#     batch_x, batch_y = data_loader.next_batch(0)
+#     batch_x_onehot = convert_to_one_hot(batch_x, 50)

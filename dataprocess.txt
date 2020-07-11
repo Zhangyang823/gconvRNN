@@ -1,0 +1,29 @@
+batch_size=20
+idx2char=20
+
+读入数据input_fnames=[test，valid，train]
+调用text_to_tensor(input_fnames, vocab_fname, tensor_fname, Adj_fname)
+生成output，存储所有将字符转换成数字之后的数据
+生成adj矩阵，x=train_data = output[0]
+           y=train_data_shift = np.zeros_like(train_data) # train_data的第一个字符移到最后面，就变成了train_data_shift
+adj[50,50],当xy为1时，权重加1
+生成pkl文件,方便读取
+
+all_data=output
+data=all_data[0]
+x_batches=reshape(data)[-1,20,50]
+y是x右移一位
+allbatch[x_batches,y_batches] #3维 0 train,1 valid 2 test
+
+batch_x, batch_y = data_loader.next_batch(0) 每1000个单词序列为一个batch
+
+
+解释coo矩阵
+row  = np.array([0, 3, 1, 0])
+col  = np.array([0, 3, 1, 2])
+data = np.array([4, 5, 7, 9])
+coo_matrix((data, (row, col))
+array([[4, 0, 9, 0],
+           [0, 7, 0, 0],
+           [0, 0, 0, 0],
+           [0, 0, 0, 5]])

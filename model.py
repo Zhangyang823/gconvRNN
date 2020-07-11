@@ -48,19 +48,27 @@ def cheby_conv(x, L, lmax, feat_out, K, W):
     L = tf.sparse_reorder(L)
     
     x0 = tf.transpose(x, perm=[1, 2, 0]) #change it to [nNode, feat_in, nSample]
-    x0 = tf.reshape(x0, [nNode, feat_in*nSample])
+    # x0 = tf.reshape(x0, [nNode, feat_in*nSample])
     x = tf.expand_dims(x0, 0) # make it [1, nNode, feat_in*nSample]
     
     def concat(x, x_):
         x_ = tf.expand_dims(x_, 0)
         return tf.concat([x, x_], axis=0)
-    
+
+    L_dense = tf.sparse_to_dense(L.indices, L.shape, L.values)
     if K > 1:
-        x1 = tf.sparse_tensor_dense_matmul(L, x0)
+        # tf.sparse_to_dense(
+        #     tf.concat(values=[indices, labels], axis=1),
+        #     [10, 10], 1.0, 0.0)
+        # L=tf.sparse_to_dense(indices=L.)
+        x1= tf.einsum('ij,jkn->ikn', L_dense, x0)
+
+        # x1 = tf.sparse_tensor_dense_matmul(L, x0)
+        # x1=tf.matmul(L,x0)
         x = concat(x, x1)
         
     for k in range(2, K):
-        x2 = 2 * tf.sparse_tensor_dense_matmul(L, x1) - x0
+        x2 = 2 * tf.einsum('ij,jkn->ikn',L_dense, x1) - x0
         x = concat(x, x2)
         x0, x1 = x1, x2
         
@@ -129,7 +137,7 @@ class gconvLSTMCell(RNNCell):
             lmax = self._lmax
             K = self._K
             feat_in = self._feat_in
-            print ("**********************************8")
+            # print ("**********************************8")
             #The inputs : [batch_size, nNode, feat_in, nTime?] size tensor
             if feat_in is None:
                 #Take out the shape of input
@@ -272,9 +280,9 @@ class Model(object):
             raise Exception("[!] Unkown model type: {}".format(self.model_type))
         
         self.rnn_output = tf.placeholder(tf.int64,
-                                         [self.batch_size, self.num_time_steps],
+                                         [self.batch_size,self.num_node,self.feat_out, self.num_time_steps],
                                          name="rnn_output")
-        self.rnn_output_seq = tf.unstack(self.rnn_output, self.num_time_steps, 1)
+        self.rnn_output_seq = tf.unstack(self.rnn_output, self.num_time_steps, 3)
         self.model_step = tf.Variable(
             0, name='model_step', trainable=False)
             
@@ -311,17 +319,19 @@ class Model(object):
                 output_reshape = tf.reshape(output, [-1, self.num_hidden])
                 prediction = tf.matmul(output_reshape, output_variable['weight']) + output_variable['bias']
                 if self.model_type == 'glstm':
-                    prediction = tf.reshape(prediction, [-1, self.num_node, 1])
+                    prediction = tf.reshape(prediction, [-1, self.num_node, 2])
                 predictions.append(prediction)
-            print("yuce",predictions)
+            # print("yuce",predictions)
             
             if self.model_type == 'lstm':
                 self.pred_out = tf.concat(predictions, 1)
             elif self.model_type == 'glstm':
-                self.pred_out = tf.concat(predictions, 2)
+                # self.pred_out=tf.expand_dims(predictions,0)
+                self.pred_out = tf.transpose(predictions, perm=[1,2,3,0])
 
             #pred_out_softmax = tf.nn.softmax(pred_out,dim=1)
             self.predictions = predictions
+
             self.model_vars = tf.contrib.framework.get_variables(
                 sc, collection=tf.GraphKeys.TRAINABLE_VARIABLES)
             
@@ -329,10 +339,13 @@ class Model(object):
         
     def _build_loss(self):
         if self.classif_loss == "cross_entropy":
-            losses = [tf.nn.sparse_softmax_cross_entropy_with_logits(
-                      logits=tf.reshape(logits, [-1, self.num_node]), labels=labels) 
-                      for logits, labels in zip(self.predictions, self.rnn_output_seq)]
-            loss_sum = tf.reduce_sum(losses, axis=1)
+            # losses = [tf.nn.softmax_cross_entropy_with_logits(
+            #           logits=logits, labels=labels)
+            #     for logits, labels in zip(self.predictions, self.rnn_output_seq)]
+            # loss_sum = tf.reduce_sum(losses, axis=1)
+            losses = tf.nn.softmax_cross_entropy_with_logits(
+                logits=self.predictions[-1], labels=self.rnn_output_seq[-1])
+            loss_sum = losses
             loss_batchmean = tf.reduce_mean(loss_sum, name="model_loss")
             
         else:
@@ -368,11 +381,9 @@ class Model(object):
                   with_output=False):
             fetch = {'loss': self.loss,
                      'optim': self.model_optim, #?
-                     'step': self.model_step #?
+                    'output':self.pred_out
             }
-            return run(sess, feed_dict, fetch,
-                       self.model_summary, summary_writer,
-                       output_op=self.pred_out if with_output else None,)
+            return sess.run(fetch, feed_dict=feed_dict)
         
         def test(sess, feed_dict, summary_writer=None,
                  with_output=False):

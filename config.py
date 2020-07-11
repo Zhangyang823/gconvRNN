@@ -26,8 +26,8 @@ data_arg.add_argument('--data_dir', type=str, default='datasets/') #data_dir : '
 train_arg = add_argument_group('Training')
 train_arg.add_argument('--task', type=str, default='ptb_char',
                        choices=['ptbchar', 'swissmt'], help='')
-train_arg.add_argument('--num_epochs', type=int, default=1, help='')
-train_arg.add_argument('--batch_size', type=int, default=20, help='')
+train_arg.add_argument('--num_epochs', type=int, default=100, help='')
+train_arg.add_argument('--batch_size', type=int, default=2, help='')
 train_arg.add_argument('--random_seed', type=int, default=123, help='')
 train_arg.add_argument('--max_step', type=int, default=1000000, help='')
 train_arg.add_argument('--is_train', type=str2bool, default=True, help='')
@@ -36,7 +36,7 @@ train_arg.add_argument('--classif_loss', type=str,
 train_arg.add_argument('--learning_rate', type=float, default=1e-4, help='')
 train_arg.add_argument('--max_grad_norm', type=float, default=-1, help='')
 train_arg.add_argument('--optimizer', type=str,
-                       default='adam', choices=['adam_wgan', 'adam', 'sgd', 'rmsprop'], help='')
+                       default='sgd', choices=['adam_wgan', 'adam', 'sgd', 'rmsprop'], help='')
 train_arg.add_argument('--checkpoint_secs', type=int, default=300, help='')
 
 # Model args
@@ -46,17 +46,17 @@ model_arg.add_argument('--model_type', type=str, default='glstm',
 
 # Hyperparams for graph
 graph_arg = add_argument_group('Graph')
-graph_arg.add_argument('--num_node', type=int, default=50, help='')
-graph_arg.add_argument('--feat_in', type=int, default=1, help='')
-graph_arg.add_argument('--feat_out', type=int, default=1, help='')
-graph_arg.add_argument('--num_hidden', type=int, default=50, help='')
+graph_arg.add_argument('--num_node', type=int, default=110, help='')
+graph_arg.add_argument('--feat_in', type=int, default=2, help='')
+graph_arg.add_argument('--feat_out', type=int, default=2, help='')
+graph_arg.add_argument('--num_hidden', type=int, default=110, help='')
 graph_arg.add_argument('--num_kernel', type=int, default=3, help='')
-train_arg.add_argument('--num_time_steps', type=int, default=50, help='')
+train_arg.add_argument('--num_time_steps', type=int, default=10, help='')
 
 # Miscellaneous (summary write, model reload)
 misc_arg = add_argument_group('Misc')
 misc_arg.add_argument('--log_step', type=int, default=20, help='')
-misc_arg.add_argument('--log_dir', type=str, default='logs')
+misc_arg.add_argument('--log_dir', type=str, default='log')
 misc_arg.add_argument('--load_path', type=str, default='')
 misc_arg.add_argument('--gpu_memory_fraction', type=float, default=1.0)
 
